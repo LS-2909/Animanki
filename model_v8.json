@@ -1,32 +1,47 @@
 {
-  "name": "Animanki Japanimation V8",
-  "model_id": 8147023901,
-  "deck_id": 1784547587781,
-  "fields": [
+  "name": "Animanki V8",
+  "model_id": 1784992523579,
+  "deck_id": 1784992523584,
+  "field_order": [
     "Anime",
-    "Titre original",
+    "TitreOriginal",
     "Studio",
-    "Compositeur OST",
-    "Œuvre originale",
+    "CompositeurOST",
+    "OeuvreOriginale",
     "Saison",
-    "Période de diffusion",
-    "Créateur original",
-    "Nombre d'épisodes",
-    "Opening 1",
-    "Opening 2",
-    "Ending 1",
-    "Ending 2",
+    "AnneeSortie",
+    "CreateurOriginal",
+    "NombreEpisodes",
+    "Opening1",
+    "Opening2",
+    "Ending1",
+    "Ending2",
     "Affiche"
   ],
-  "cards": [
-    "Année + Studio -> Anime",
-    "Anime + Année + Saison -> Studio",
-    "Anime -> Créateur original",
-    "Anime -> Œuvre originale",
-    "Anime + Studio + Saison -> Année"
+  "database_field_order": [
+    "anime",
+    "titre_original",
+    "studio",
+    "compositeur_ost",
+    "oeuvre_originale",
+    "saison",
+    "annee_sortie",
+    "createur_original",
+    "nombre_episodes",
+    "opening_1",
+    "opening_2",
+    "ending_1",
+    "ending_2",
+    "affiche"
   ],
-  "opening_ending_cards": false,
-  "poster_front": false,
-  "poster_back": true,
-  "info_dropdown_back": true
+  "card_templates": [
+    "Année + Studio → Anime",
+    "Anime + Année + Saison → Studio",
+    "Anime → Créateur original",
+    "Anime → Œuvre originale",
+    "Anime + Studio + Saison → Année"
+  ],
+  "cards_per_note": 5,
+  "seed_file": "template/Animanki_V8_seed.apkg.b64",
+  "notes_synced": 22
 }
