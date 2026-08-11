@@ -39,9 +39,10 @@
     "Anime + Année + Saison → Studio",
     "Anime → Créateur original",
     "Anime → Œuvre originale",
-    "Anime + Studio + Saison → Année"
+    "Anime + Studio + Saison → Année",
+    "Anime + Année → Compositeur OST"
   ],
-  "cards_per_note": 5,
+  "cards_per_note": 6,
   "seed_file": "template/Animanki_V8_seed.apkg.b64",
   "theme": {
     "version": "premium-symbols-v2-proto",
