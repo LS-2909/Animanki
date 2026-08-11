@@ -1,5 +1,5 @@
 {
-  "name": "Animanki V8",
+  "name": "Animanki Premium Symboles",
   "model_id": 1784992523579,
   "deck_id": 1784992523584,
   "field_order": [
@@ -43,5 +43,20 @@
   ],
   "cards_per_note": 5,
   "seed_file": "template/Animanki_V8_seed.apkg.b64",
-  "notes_synced": 22
+  "theme": {
+    "version": "premium-symbols-v1",
+    "characters": false,
+    "motifs": [
+      "boule 4 étoiles",
+      "chapeau de paille / symbole pirate",
+      "spirale shinobi",
+      "symbole shinigami stylisé"
+    ],
+    "palette": ["orange", "parchemin", "bleu", "violet", "noir"],
+    "layout": "responsive premium dark",
+    "poster_on_front": false,
+    "poster_on_back": true,
+    "music_on_back": true
+  },
+  "notes_synced": 23
 }
