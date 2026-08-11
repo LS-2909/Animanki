@@ -44,16 +44,27 @@
   "cards_per_note": 5,
   "seed_file": "template/Animanki_V8_seed.apkg.b64",
   "theme": {
-    "version": "premium-symbols-v1",
+    "version": "premium-symbols-v2-proto",
     "characters": false,
     "motifs": [
-      "boule 4 étoiles",
-      "chapeau de paille / symbole pirate",
+      "boule 4 étoiles stylisée",
+      "chapeau de paille stylisé",
       "spirale shinobi",
       "symbole shinigami stylisé"
     ],
-    "palette": ["orange", "parchemin", "bleu", "violet", "noir"],
-    "layout": "responsive premium dark",
+    "palette": ["orange brûlé", "parchemin", "bleu profond", "violet", "noir charbon", "or"],
+    "layout": "proto premium compact mobile",
+    "design_targets": [
+      "recto avec grand panneau parchemin central",
+      "éclaboussures et bandes colorées aux quatre coins",
+      "symboles discrets sans personnages",
+      "verso en trois colonnes sur grand écran",
+      "affiche centrée",
+      "informations à gauche",
+      "opening/ending/compositeur à droite",
+      "panneau autres informations repliable",
+      "mobile sans grand espace vide"
+    ],
     "poster_on_front": false,
     "poster_on_back": true,
     "music_on_back": true
