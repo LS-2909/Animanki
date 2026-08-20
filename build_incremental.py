@@ -8,7 +8,34 @@ FIELD_KEYS = [
     "ending_1","ending_2","affiche"
 ]
 
-def add_note(cur, note, model_id, deck_id):
+DECK_BY_ORD = {
+    0: (1787225000001, "Titre de l'anime"),
+    1: (1787225000002, "Studio"),
+    2: (1787225000003, "Créateur original"),
+    3: (1787225000004, "Œuvre originale"),
+    4: (1787225000005, "Année"),
+    5: (1787225000006, "Compositeur OST"),
+}
+
+
+def ensure_category_decks(cur, parent_deck_id):
+    row = cur.execute("SELECT name,common,kind FROM decks WHERE id=?", (parent_deck_id,)).fetchone()
+    if not row:
+        raise RuntimeError(f"Deck parent introuvable: {parent_deck_id}")
+    parent_name, common, kind = row
+    for ord_, (did, label) in DECK_BY_ORD.items():
+        name = parent_name + "\x1f" + label
+        existing = cur.execute("SELECT id FROM decks WHERE id=? OR name=?", (did, name)).fetchone()
+        if existing:
+            cur.execute("UPDATE decks SET name=?,mtime_secs=?,usn=-1 WHERE id=?", (name, int(time.time()), existing[0]))
+        else:
+            cur.execute(
+                "INSERT INTO decks(id,name,mtime_secs,usn,common,kind) VALUES(?,?,?,?,?,?)",
+                (did, name, int(time.time()), -1, common, kind)
+            )
+
+
+def add_note(cur, note, model_id):
     now_s = int(time.time())
     now_ms = int(time.time()*1000)
     max_note = cur.execute("SELECT COALESCE(MAX(id),0) FROM notes").fetchone()[0]
@@ -25,14 +52,16 @@ def add_note(cur, note, model_id, deck_id):
         (nid,guid,model_id,now_s,-1,tags,flds,values[0],csum,0,"")
     )
     max_due = cur.execute("SELECT COALESCE(MAX(due),0) FROM cards").fetchone()[0]
-    for ord_ in range(5):
+    for ord_ in range(6):
+        did = DECK_BY_ORD[ord_][0]
         cur.execute(
             """INSERT INTO cards(id,nid,did,ord,mod,usn,type,queue,due,ivl,factor,
                reps,lapses,left,odue,odid,flags,data)
                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (nid+ord_+1,nid,deck_id,ord_,now_s,-1,0,0,max_due+ord_+1,
+            (nid+ord_+1,nid,did,ord_,now_s,-1,0,0,max_due+ord_+1,
              0,0,0,0,0,0,0,0,"")
         )
+
 
 def main():
     ap=argparse.ArgumentParser()
@@ -63,9 +92,12 @@ def main():
         comp=td/"collection.anki21b"
         db=td/"collection.anki21"
         subprocess.run(["zstd","-d","-q",str(comp),"-o",str(db)],check=True)
-        con=sqlite3.connect(db);cur=con.cursor()
+        con=sqlite3.connect(db)
+        con.create_collation("unicase",lambda a,b:(a.casefold()>b.casefold())-(a.casefold()<b.casefold()))
+        cur=con.cursor()
+        ensure_category_decks(cur, data["deck_id"])
         for note in selected:
-            add_note(cur,note,data["model_id"],data["deck_id"])
+            add_note(cur,note,data["model_id"])
         cur.execute("UPDATE col SET mod=? WHERE id=1",(int(time.time()*1000),))
         con.commit();con.close()
         comp.unlink()
