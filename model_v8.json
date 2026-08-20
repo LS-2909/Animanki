@@ -43,6 +43,14 @@
     "Anime + Année → Compositeur OST"
   ],
   "cards_per_note": 6,
+  "deck_routing": {
+    "0": {"deck_id": 1787225000001, "name": "Titre de l'anime"},
+    "1": {"deck_id": 1787225000002, "name": "Studio"},
+    "2": {"deck_id": 1787225000003, "name": "Créateur original"},
+    "3": {"deck_id": 1787225000004, "name": "Œuvre originale"},
+    "4": {"deck_id": 1787225000005, "name": "Année"},
+    "5": {"deck_id": 1787225000006, "name": "Compositeur OST"}
+  },
   "seed_file": "template/Animanki_V8_seed.apkg.b64",
   "theme": {
     "version": "premium-symbols-v3-reference-lock",
