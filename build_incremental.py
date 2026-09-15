@@ -1,93 +1,81 @@
 #!/usr/bin/env python3
 from pathlib import Path
-import argparse, hashlib, json, random, sqlite3, string, subprocess, tempfile, time, zipfile
-
-# Current Animanki note model: 16 fields, 5 generated cards.
-# CreateurOriginal, Realisateur and Scenario remain note fields but do not generate cards.
-FIELD_KEYS = [
-    "anime","titre_original","studio","compositeur_ost","oeuvre_originale","saison",
-    "annee_sortie","createur_original","nombre_episodes","opening_1","opening_2",
-    "ending_1","ending_2","affiche","realisateur","scenario"
-]
-
-# Current card ords after removal of Creator/Director cards.
-DECK_BY_ORD = {
-    0: (1787225000001, "Titre de l'anime"),
-    1: (1787225000002, "Studio"),
-    2: (1787225000004, "Œuvre originale"),
-    3: (1787225000005, "Année"),
-    4: (1787225000006, "Compositeur OST"),
-}
-
-
-def ensure_category_decks(cur, parent_deck_id):
-    row = cur.execute("SELECT name,common,kind FROM decks WHERE id=?", (parent_deck_id,)).fetchone()
-    if not row:
-        raise RuntimeError(f"Deck parent introuvable: {parent_deck_id}")
-    parent_name, common, kind = row
-    for _, (did, label) in DECK_BY_ORD.items():
-        name = parent_name + "\x1f" + label
-        existing = cur.execute("SELECT id FROM decks WHERE id=? OR name=?", (did, name)).fetchone()
-        if existing:
-            cur.execute("UPDATE decks SET name=?,mtime_secs=?,usn=-1 WHERE id=?", (name, int(time.time()), existing[0]))
-        else:
-            cur.execute("INSERT INTO decks(id,name,mtime_secs,usn,common,kind) VALUES(?,?,?,?,?,?)",
-                        (did,name,int(time.time()),-1,common,kind))
-
-
-def add_note(cur, note, model_id):
-    now_s=int(time.time()); now_ms=int(time.time()*1000)
-    max_note=cur.execute("SELECT COALESCE(MAX(id),0) FROM notes").fetchone()[0]
-    max_card=cur.execute("SELECT COALESCE(MAX(id),0) FROM cards").fetchone()[0]
-    nid=max(now_ms,max_note+10,max_card+10)
-    guid="".join(random.choice(string.ascii_letters+string.digits) for _ in range(10))
-    values=[str(note.get(k,"") or "") for k in FIELD_KEYS]
-    flds="\x1f".join(values)
-    csum=int(hashlib.sha1(values[0].encode("utf-8")).hexdigest()[:8],16)
-    tags=" "+" ".join(note.get("tags",["animation_japonaise"]))+" "
-    cur.execute("""INSERT INTO notes(id,guid,mid,mod,usn,tags,flds,sfld,csum,flags,data)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
-                (nid,guid,model_id,now_s,-1,tags,flds,values[0],csum,0,""))
-    max_due=cur.execute("SELECT COALESCE(MAX(due),0) FROM cards").fetchone()[0]
-    for ord_ in range(5):
-        did=DECK_BY_ORD[ord_][0]
-        cur.execute("""INSERT INTO cards(id,nid,did,ord,mod,usn,type,queue,due,ivl,factor,
-                       reps,lapses,left,odue,odid,flags,data)
-                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (nid+ord_+1,nid,did,ord_,now_s,-1,0,0,max_due+ord_+1,0,0,0,0,0,0,0,0,""))
-
-
+import argparse,hashlib,json,random,sqlite3,string,subprocess,tempfile,time,zipfile
+FIELD_KEYS=["anime","titre_original","studio","compositeur_ost","oeuvre_originale","saison","annee_sortie","createur_original","nombre_episodes","opening_1","opening_2","ending_1","ending_2","affiche","realisateur","scenario"]
+DECK_BY_ORD={0:(1787225000001,"Titre de l'anime"),1:(1787225000002,"Studio"),2:(1787225000004,"Œuvre originale"),3:(1787225000005,"Année"),4:(1787225000006,"Compositeur OST")}
+def rv(d,i):
+ v=s=0
+ while 1:
+  b=d[i];i+=1;v|=(b&127)<<s
+  if b<128:return v,i
+  s+=7
+def ev(v):
+ r=bytearray()
+ while 1:
+  b=v&127;v>>=7;r.append(b|(128 if v else 0))
+  if not v:return bytes(r)
+def parts(raw):
+ i=0;o=[]
+ while i<len(raw):
+  st=i;k,i=rv(raw,i);fn,wt=k>>3,k&7
+  if wt==0:_,en=rv(raw,i)
+  elif wt==1:en=i+8
+  elif wt==2:ln,p=rv(raw,i);en=p+ln
+  elif wt==5:en=i+4
+  else:raise ValueError(wt)
+  o.append((fn,wt,raw[st:en]));i=en
+ return o
+def getstr(raw,fn):
+ for f,w,ch in parts(raw):
+  if f==fn and w==2:
+   i=0;_,i=rv(ch,i);ln,i=rv(ch,i);return ch[i:i+ln].decode()
+ return ""
+def setfield(raw,fn,val,wt=2):
+ if wt==2:b=val.encode();rep=ev((fn<<3)|2)+ev(len(b))+b
+ else:rep=ev((fn<<3)|0)+ev(val)
+ o=[];done=False
+ for f,w,ch in parts(raw):
+  if f==fn:
+   if not done:o.append(rep);done=True
+  else:o.append(ch)
+ if not done:o.append(rep)
+ return b''.join(o)
+def migrate_seed(cur,mid):
+ # Add the two metadata fields if the historical seed lacks them.
+ fs=cur.execute("select ord,name,config from fields where ntid=? order by ord",(mid,)).fetchall();names=[x[1] for x in fs];cfg=fs[-1][2]
+ for name in ("Realisateur","Scenario"):
+  if name not in names:cur.execute("insert into fields(ntid,ord,name,config) values(?,?,?,?)",(mid,len(names),name,cfg));names.append(name)
+ # Old seed ords: 0 title,1 studio,2 creator,3 work,4 year,5 composer. Remove creator and compact ords.
+ if cur.execute("select 1 from templates where ntid=? and ord=5",(mid,)).fetchone():
+  cur.execute("delete from cards where nid in(select id from notes where mid=?) and ord=2",(mid,));cur.execute("delete from templates where ntid=? and ord=2",(mid,))
+  for old,new in ((3,2),(4,3),(5,4)):
+   cur.execute("update cards set ord=? where nid in(select id from notes where mid=?) and ord=?",(new,mid,old));cur.execute("update templates set ord=? where ntid=? and ord=?",(new,mid,old))
+ # Director is context on every front, never a dedicated card.
+ for o,name,cfg in cur.execute("select ord,name,config from templates where ntid=? order by ord",(mid,)).fetchall():
+  raw=bytes(cfg);q=getstr(raw,1)
+  if "{{Realisateur}}" not in q:q += '<div class="director">Réalisateur : {{Realisateur}}</div>'
+  raw=setfield(raw,1,q);raw=setfield(raw,5,DECK_BY_ORD[o][0],0)
+  cur.execute("update templates set config=?,mtime_secs=?,usn=-1 where ntid=? and ord=?",(raw,int(time.time()),mid,o))
+def ensure_decks(cur,parent):
+ row=cur.execute("select name,common,kind from decks where id=?",(parent,)).fetchone();pn,common,kind=row
+ for o,(did,label) in DECK_BY_ORD.items():
+  name=pn+'\x1f'+label;r=cur.execute("select id from decks where id=? or name=?",(did,name)).fetchone()
+  if r:cur.execute("update decks set name=?,mtime_secs=?,usn=-1 where id=?",(name,int(time.time()),r[0]))
+  else:cur.execute("insert into decks(id,name,mtime_secs,usn,common,kind) values(?,?,?,?,?,?)",(did,name,int(time.time()),-1,common,kind))
+def add_note(cur,note,mid):
+ now=int(time.time());nid=max(int(time.time()*1000),cur.execute("select coalesce(max(id),0)+10 from notes").fetchone()[0],cur.execute("select coalesce(max(id),0)+10 from cards").fetchone()[0]);guid=''.join(random.choice(string.ascii_letters+string.digits) for _ in range(10));v=[str(note.get(k,'') or '') for k in FIELD_KEYS];f='\x1f'.join(v);cs=int(hashlib.sha1(v[0].encode()).hexdigest()[:8],16);tags=' '+' '.join(note.get('tags',['animation_japonaise']))+' '
+ cur.execute("insert into notes values(?,?,?,?,?,?,?,?,?,?,?)",(nid,guid,mid,now,-1,tags,f,v[0],cs,0,''));due=cur.execute("select coalesce(max(due),0) from cards").fetchone()[0]
+ for o in range(5):cur.execute("insert into cards values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",(nid+o+1,nid,DECK_BY_ORD[o][0],o,now,-1,0,0,due+o+1,0,0,0,0,0,0,0,0,''))
 def main():
-    ap=argparse.ArgumentParser()
-    ap.add_argument("--database",default="database.json")
-    ap.add_argument("--seed",default="template/Animanki_current_seed.apkg.b64")
-    ap.add_argument("--output",default="output/Animanki_Ajout.apkg")
-    ap.add_argument("--all",action="store_true")
-    args=ap.parse_args()
-    db_path=Path(args.database); seed_path=Path(args.seed); out_path=Path(args.output)
-    data=json.loads(db_path.read_text("utf-8"))
-    selected=[n for n in data["notes"] if args.all or not n.get("exported",False)]
-    if not selected: raise SystemExit("Aucune nouvelle note à exporter.")
-    out_path.parent.mkdir(parents=True,exist_ok=True)
-    with tempfile.TemporaryDirectory() as tmp:
-        td=Path(tmp)
-        if seed_path.suffix==".b64":
-            import base64
-            seed_apkg=td/"seed.apkg"; seed_apkg.write_bytes(base64.b64decode(seed_path.read_text("ascii")))
-        else: seed_apkg=seed_path
-        with zipfile.ZipFile(seed_apkg) as z:z.extractall(td)
-        comp=td/"collection.anki21b"; db=td/"collection.anki21"
-        subprocess.run(["zstd","-d","-q",str(comp),"-o",str(db)],check=True)
-        con=sqlite3.connect(db)
-        con.create_collation("unicase",lambda a,b:(a.casefold()>b.casefold())-(a.casefold()<b.casefold()))
-        cur=con.cursor(); ensure_category_decks(cur,data["deck_id"])
-        for note in selected:add_note(cur,note,data["model_id"])
-        cur.execute("UPDATE col SET mod=? WHERE id=1",(int(time.time()*1000),));con.commit();con.close()
-        comp.unlink();subprocess.run(["zstd","-q","-19",str(db),"-o",str(comp)],check=True);db.unlink()
-        with zipfile.ZipFile(out_path,"w",zipfile.ZIP_DEFLATED) as z:
-            for p in td.iterdir():z.write(p,p.name)
-    for note in selected:note["exported"]=True
-    db_path.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding="utf-8")
-    print(f"{len(selected)} note(s) exportée(s) vers {out_path}")
-
-if __name__=="__main__":main()
+ ap=argparse.ArgumentParser();ap.add_argument('--database',default='database.json');ap.add_argument('--seed',default='template/Animanki_V8_seed.apkg.b64');ap.add_argument('--output',default='output/Animanki_Ajout.apkg');ap.add_argument('--all',action='store_true');a=ap.parse_args();dp=Path(a.database);data=json.loads(dp.read_text('utf-8'));sel=[n for n in data['notes'] if a.all or not n.get('exported',False)]
+ if not sel:raise SystemExit('Aucune nouvelle note à exporter.')
+ with tempfile.TemporaryDirectory() as x:
+  p=Path(x);import base64;seed=p/'seed.apkg';seed.write_bytes(base64.b64decode(Path(a.seed).read_text('ascii')));zipfile.ZipFile(seed).extractall(p);seed.unlink();z=p/'collection.anki21b';d=p/'collection.anki21';subprocess.run(['zstd','-d','-q',str(z),'-o',str(d)],check=True);q=sqlite3.connect(d);q.create_collation('unicase',lambda a,b:(a.casefold()>b.casefold())-(a.casefold()<b.casefold()));c=q.cursor();m=data['model_id'];migrate_seed(c,m);ensure_decks(c,data['deck_id'])
+  c.execute('delete from revlog');c.execute('delete from cards');c.execute('delete from notes');c.execute('delete from graves')
+  for n in sel:add_note(c,n,m)
+  q.commit();q.close();z.unlink();subprocess.run(['zstd','-q','-19',str(d),'-o',str(z)],check=True);d.unlink();Path(a.output).parent.mkdir(parents=True,exist_ok=True)
+  with zipfile.ZipFile(a.output,'w',zipfile.ZIP_DEFLATED) as w:
+   for f in p.iterdir():w.write(f,f.name)
+ for n in sel:n['exported']=True
+ dp.write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf-8');print(f'{len(sel)} note(s) exportée(s) vers {a.output}')
+if __name__=='__main__':main()
