@@ -4,24 +4,19 @@
   "deck_id": 1784992523584,
   "field_order": ["Anime","TitreOriginal","Studio","CompositeurOST","OeuvreOriginale","Saison","AnneeSortie","CreateurOriginal","NombreEpisodes","Opening1","Opening2","Ending1","Ending2","Affiche","Realisateur","Scenario"],
   "database_field_order": ["anime","titre_original","studio","compositeur_ost","oeuvre_originale","saison","annee_sortie","createur_original","nombre_episodes","opening_1","opening_2","ending_1","ending_2","affiche","realisateur","scenario"],
-  "card_templates": [
-    "Année + Studio → Anime",
-    "Anime + Année + Saison → Studio",
-    "Anime → Œuvre originale",
-    "Anime + Studio + Saison → Année",
-    "Anime + Année → Compositeur OST"
-  ],
+  "card_templates": ["Année + Studio → Anime","Anime + Année + Saison → Studio","Anime → Œuvre originale","Anime + Studio + Saison → Année","Anime + Année → Compositeur OST"],
   "cards_per_note": 5,
   "non_card_fields": ["CreateurOriginal","Realisateur","Scenario"],
   "front_context": ["Realisateur"],
   "deck_routing": {
-    "0": {"deck_id": 1787225000001, "name": "Titre de l'anime"},
-    "1": {"deck_id": 1787225000002, "name": "Studio"},
-    "2": {"deck_id": 1787225000004, "name": "Œuvre originale"},
-    "3": {"deck_id": 1787225000005, "name": "Année"},
-    "4": {"deck_id": 1787225000006, "name": "Compositeur OST"}
+    "0":{"deck_id":1787225000001,"name":"Titre de l'anime"},
+    "1":{"deck_id":1787225000002,"name":"Studio"},
+    "2":{"deck_id":1787225000004,"name":"Œuvre originale"},
+    "3":{"deck_id":1787225000005,"name":"Année"},
+    "4":{"deck_id":1787225000006,"name":"Compositeur OST"}
   },
-  "seed_file": "template/Animanki_current_seed.apkg.b64",
+  "seed_file": "template/Animanki_V8_seed.apkg.b64",
+  "seed_migration": "build_incremental.py upgrades the historical seed to the current 16-field/5-card schema before export",
   "poster_on_front": false,
   "poster_on_back": true,
   "music_on_back": true
